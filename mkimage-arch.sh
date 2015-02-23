@@ -35,33 +35,109 @@ ROOTFS=$(mktemp -d ${TMPDIR:-/var/tmp}/rootfs-archlinux-XXXXXXXXXX)
 trap exit_cleanup EXIT
 chmod 755 $ROOTFS
 
+PKGBSTRAP_BUSYBOX=(
+	busybox-coreutils
+	busybox-iputils
+	busybox-findutils
+	procps-ng-nosystemd
+	sed
+	gzip
+	pacman
+	texinfo-fake
+	# gmp
+	# mpfr
+	# libunistring
+	# haveged
+)
+PKGBSTRAP=(
+	busybox-coreutils
+	# coreutils-static
+	busybox-iputils
+	busybox-findutils
+	procps-ng-nosystemd
+	sed
+	gzip
+	pacman
+	texinfo-fake
+	haveged
+	no-certificates
+	# gmp
+	# mpfr
+	# libunistring
+)
+PKGBSTRAP=(
+	texinfo-fake
+	# no-certificates
+	procps-ng-nosystemd
+	pacman
+	sed
+	gzip
+	# coreutils
+	busybox-coreutils
+	busybox-util-linux
+	busybox-iputils
+	busybox-findutils
+	haveged
+	ca-certificates
+	# gmp
+	# mpfr
+	# libunistring
+)
 # packages to ignore for space savings
 PKGIGNORE=(
-    cryptsetup
-    device-mapper
-    dhcpcd
-    iproute2
-    jfsutils
-    linux
-    lvm2
-    man-db
-    man-pages
-    mdadm
-    nano
-    netctl
-    openresolv
-    pciutils
-    pcmciautils
-    reiserfsprogs
-    s-nail
-    systemd-sysvcompat
-    usbutils
-    vi
-    xfsprogs
+  cryptsetup
+  device-mapper
+  dhcpcd
+  iproute2
+  jfsutils
+  linux
+  lvm2
+  man-db
+  man-pages
+  mdadm
+  nano
+  netctl
+  openresolv
+  pciutils
+  pcmciautils
+  reiserfsprogs
+  s-nail
+  systemd-sysvcompat
+  usbutils
+  vi
+  xfsprogs
+	util-linux
+	systemd
+	procps-ng
+	texinfo
+	# pambase
+	# pam
+	# shadow
+	# inetutils
+	# iputils
+	sysfsutils
+	# libtasn1
+	# p11-kit
+	# ca-certificates-utils
+	# ca-certificates-mozilla
+	# ca-certificates-cacert
+	# ca-certificates
+	# coreutils
+	findutils
 )
+# pacman
+# openssl
+# perl
 IFS=','
 PKGIGNORE="${PKGIGNORE[*]}"
 unset IFS
+
+PKGBSTRAP="${PKGBSTRAP[*]}"
+
+LOCAL_REPO=/home/ruiandrada/Repo/Docker/archlinux-repository
+# mkdir -p $ROOTFS/tmp/tmprepo
+# cp -va $LOCAL_REPO $ROOTFS/tmp/tmprepo
+
 
 LC_ALL=C expect <<EOF
 	set send_slow {1 .1}
@@ -71,7 +147,7 @@ LC_ALL=C expect <<EOF
 	}
 	set timeout 300
 
-	spawn pacstrap -C ./mkimage-arch-pacman.conf -c -d -G -M -i $ROOTFS base haveged --ignore $PKGIGNORE
+	spawn pacstrap -C ./mkimage-arch-pacman.conf -c -d -G -M -i $ROOTFS $PKGBSTRAP --ignore $PKGIGNORE
 	expect {
 		-exact "anyway? \[Y/n\] " { send -- "n\r"; exp_continue }
 		-exact "(default=all): " { send -- "\r"; exp_continue }
@@ -79,18 +155,22 @@ LC_ALL=C expect <<EOF
 	}
 EOF
 
+# arch-chroot $ROOTFS /bin/sh -c 'pacman -U --noconfirm /tmp/tmprepo/busybox-coreutils*'
+arch-chroot $ROOTFS /bin/sh -c 'echo -e "PATH:$PATH"'
 arch-chroot $ROOTFS /bin/sh -c 'rm -r /usr/share/man/*'
 arch-chroot $ROOTFS /bin/sh -c 'haveged -w 1024; pacman-key --init; pkill haveged; pacman -Rs --noconfirm haveged; pacman-key --populate archlinux; pkill gpg-agent'
 arch-chroot $ROOTFS /bin/sh -c 'ln -s /usr/share/zoneinfo/UTC /etc/localtime'
 echo 'en_US.UTF-8 UTF-8' > $ROOTFS/etc/locale.gen
 arch-chroot $ROOTFS locale-gen
-# arch-chroot $ROOTFS /bin/sh -c 'echo "Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist'
-arch-chroot $ROOTFS /bin/sh -c "echo -n 'Preparing mirrorlist...' \
-	&& cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup \
-	&& sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist.backup \
-	&& rankmirrors -n 10 /etc/pacman.d/mirrorlist.backup > /etc/pacman.d/mirrorlist \
-	&& echo 'Done.'
-"
+
+## Pacman mirror setup
+arch-chroot $ROOTFS /bin/sh -c 'echo "Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist'
+# arch-chroot $ROOTFS /bin/sh -c "echo -n 'Preparing mirrorlist...' \
+# 	&& cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup \
+# 	&& sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist.backup \
+# 	&& rankmirrors -n 10 /etc/pacman.d/mirrorlist.backup > /etc/pacman.d/mirrorlist \
+# 	&& echo 'Done.'
+# "
 
 # udev doesn't work in containers, rebuild /dev
 DEV=$ROOTFS/dev
@@ -121,6 +201,5 @@ pre_image_cleanup \
 	&& tar --numeric-owner --xattrs --acls -C $ROOTFS -c . \
 	| docker import - $IMAGE_TAG \
 	&& [ "$1" == "latest" ] && docker tag -f $IMAGE_TAG $IMAGE:latest
-docker run --rm=true -t $IMAGE_TAG echo "$IMAGE_TAG successfully built." \
-	&& pacman --version
+docker run --rm $IMAGE_TAG pacman --version && echo "$IMAGE_TAG successfully built."
 # var_cleanup
