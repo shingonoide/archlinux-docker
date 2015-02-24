@@ -168,13 +168,13 @@ arch-chroot $ROOTFS locale-gen
 
 
 ## Pacman mirror setup
-arch-chroot $ROOTFS /bin/sh -c 'echo "Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist'
-# arch-chroot $ROOTFS /bin/sh -c "echo -n 'Preparing mirrorlist...' \
-# 	&& cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup \
-# 	&& sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist.backup \
-# 	&& rankmirrors -n 10 /etc/pacman.d/mirrorlist.backup > /etc/pacman.d/mirrorlist \
-# 	&& echo 'Done.'
-# "
+# arch-chroot $ROOTFS /bin/sh -c 'echo "Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist'
+arch-chroot $ROOTFS /bin/sh -c "echo -n 'Preparing mirrorlist...' \
+	&& cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup \
+	&& sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist.backup \
+	&& rankmirrors -n 10 /etc/pacman.d/mirrorlist.backup > /etc/pacman.d/mirrorlist \
+	&& echo 'Done.'
+"
 
 # udev doesn't work in containers, rebuild /dev
 DEV=$ROOTFS/dev
